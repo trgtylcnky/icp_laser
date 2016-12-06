@@ -19,11 +19,11 @@
 
 
 //Publish simulated laser scan for debug purposes
-//#define PUBLISH_SIMULATED_LASER_SCAN
+#define PUBLISH_SIMULATED_LASER_SCAN
 
-//#define PUBLISH_SIMULATED_LASER_CLOUD
+#define PUBLISH_SIMULATED_LASER_CLOUD
 
-//#define PUBLISH_LASER_CLOUD
+#define PUBLISH_LASER_CLOUD
 
 class icp_laser
 {
@@ -81,7 +81,7 @@ class icp_laser
 
 public:
 	icp_laser();
-	void publishSimulatedLaserScan(sensor_msgs::LaserScan::Ptr);
+
 	sensor_msgs::LaserScan::Ptr createSimulatedLaserScan(geometry_msgs::Pose&);
 	void getMapFromTopic(const nav_msgs::OccupancyGrid::Ptr);
 	void getLaserFromTopic(const sensor_msgs::LaserScan::Ptr);
@@ -101,7 +101,7 @@ public:
 	void laserToPCloud(
 		sensor_msgs::LaserScan& scan, 
 		geometry_msgs::Pose pos, 
-		pcl::PointCloud<pcl::PointXYZ>::Ptr result, 
+		pcl::PointCloud<pcl::PointXYZ>::Ptr& result, 
 		double radius_threshold = 0,
 		int count_threshold = 0)
 	{
@@ -113,14 +113,10 @@ public:
 
 		double laser_yaw = tf::getYaw(pos.orientation);
 
-		ROS_INFO("0");
 
-		ROS_INFO("%lu", result->points.size());
 
 		//result->points.resize(n);
 
-
-		ROS_INFO("%u %lu", n, scan.ranges.size());
 
 		result->points.clear();
 

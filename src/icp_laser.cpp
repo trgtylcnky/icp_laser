@@ -25,19 +25,19 @@ icp_laser::icp_laser()
 	laser_cloud_publisher = nodeHandle.advertise<pcl::PointCloud<pcl::PointXYZ> >("/icp_laser/laser_cloud", 1000);
 	#endif
 
-	max_simulated_point_distance = 2;
+	max_simulated_point_distance = 3;
 	min_simulated_point_count = 200;
 
-	max_laser_point_distance = 2;
+	max_laser_point_distance = 3;
 	min_laser_point_count = 200;
 
-	icp_max_correspondence_distance = 0.2;
-	icp_max_iterations = 50;
-	icp_transformation_epsilon = 1e-7;
+	icp_max_correspondence_distance = 1;
+	icp_max_iterations = 2000;
+	icp_transformation_epsilon = 1e-6;
 
 	max_jump_distance = 0.8;
-	min_jump_distance = 0.1;
-	min_rotation = 0.05;
+	min_jump_distance = 0.05;
+	min_rotation = 0.02;
 	max_rotation = 0.7;
 
 	update_interval = 5;
@@ -100,7 +100,7 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 		sml = occupancy_grid_utils::simulateRangeScan(map, pos, laser, false);
 
 		#ifdef PUBLISH_SIMULATED_LASER_SCAN
-		sim_laser_publisher.publish(*scan);
+		sim_laser_publisher.publish(*sml);
 		#endif
 
 	}
@@ -154,6 +154,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		icp.setMaxCorrespondenceDistance (icp_max_correspondence_distance);
 		icp.setMaximumIterations (icp_max_iterations);
 		icp.setTransformationEpsilon (icp_transformation_epsilon);
+		icp.setEuclideanFitnessEpsilon (0.0001);
 
 		pcl::PointCloud<pcl::PointXYZ> Final;
 
@@ -180,8 +181,8 @@ void icp_laser::updatePose(tf::Transform t)
 
 	ROS_INFO("time: %f", interval.toSec());
 	ROS_INFO("%f %f %f", 
-		abs(t.getOrigin().x()),
 		t.getOrigin().x(),
+		t.getOrigin().y(),
 		tf::getYaw(t.getRotation()));
 
 

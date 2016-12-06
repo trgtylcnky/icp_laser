@@ -9,9 +9,9 @@ int main(int argc, char** argv)
 	ros::NodeHandle n;
 
 	icp_laser il;
-	il.setUpdateInterval(2);
+	il.setUpdateInterval(0.1);
 
-	ros::Rate r(2);
+	ros::Rate r(5);
 
 
 	pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
