@@ -93,6 +93,8 @@ public:
 
 	void setJumpParameters(double, double, double, double);
 
+	void setUpdateInterval(double);
+
 	void updatePose(tf::Transform);
 
 

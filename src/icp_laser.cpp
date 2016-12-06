@@ -257,3 +257,7 @@ void icp_laser::setJumpParameters(double a, double b, double c, double d)
 	max_rotation = c;
 	min_rotation = d;
 }
+void icp_laser::setUpdateInterval(double t)
+{
+	update_interval = t;
+}
