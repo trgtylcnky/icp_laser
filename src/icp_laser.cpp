@@ -37,6 +37,8 @@ icp_laser::icp_laser()
 
 	max_jump_distance = 0.8;
 	min_jump_distance = 0.1;
+	min_rotation = 0.05;
+	max_rotation = 0.7;
 
 	update_interval = 5;
 	update_time = ros::Time::now();
@@ -186,9 +188,11 @@ void icp_laser::updatePose(tf::Transform t)
 	if (interval.toSec() > update_interval &&
 		abs(t.getOrigin().x())<max_jump_distance &&
 		abs(t.getOrigin().y())<max_jump_distance &&
+		abs(tf::getYaw(t.getRotation())) < max_rotation &&
 
 		(abs(t.getOrigin().x())>min_jump_distance ||
-		abs(t.getOrigin().y())>min_jump_distance 
+		abs(t.getOrigin().y())>min_jump_distance ||
+		abs(tf::getYaw(t.getRotation())) > min_rotation
 		) 
 		) 
 	{
@@ -245,4 +249,11 @@ void icp_laser::setLaserCloudParameters(double a, int b, double c, int d)
 	min_simulated_point_count = b;
 	max_simulated_point_distance = c;
 	min_simulated_point_count = d;
+}
+void icp_laser::setJumpParameters(double a, double b, double c, double d)
+{
+	max_jump_distance = a;
+	min_jump_distance = b;
+	max_rotation = c;
+	min_rotation = d;
 }

@@ -73,6 +73,8 @@ class icp_laser
 
 	double max_jump_distance;
 	double min_jump_distance;
+	double max_rotation;
+	double min_rotation;
 
 	double update_interval;
 	ros::Time update_time;
@@ -88,6 +90,8 @@ public:
 
 	void setICPParameters(double, unsigned int, double);
 	void setLaserCloudParameters(double, int, double, int);
+
+	void setJumpParameters(double, double, double, double);
 
 	void updatePose(tf::Transform);
 
