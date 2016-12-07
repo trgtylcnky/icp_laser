@@ -25,23 +25,33 @@ icp_laser::icp_laser()
 	laser_cloud_publisher = nodeHandle.advertise<pcl::PointCloud<pcl::PointXYZ> >("/icp_laser/laser_cloud", 1000);
 	#endif
 
-	max_simulated_point_distance = 3;
+	laser_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new (pcl::PointCloud<pcl::PointXYZ>));
+	laser_cloud->header.frame_id = "/map";
+	
+	max_simulated_point_distance = 8;
 	min_simulated_point_count = 200;
 
-	max_laser_point_distance = 3;
+	max_laser_point_distance = 8;
 	min_laser_point_count = 200;
 
-	icp_max_correspondence_distance = 1;
-	icp_max_iterations = 2000;
+	icp_max_correspondence_distance = 0.5;
+	icp_max_iterations = 250;
 	icp_transformation_epsilon = 1e-6;
 
 	max_jump_distance = 0.8;
-	min_jump_distance = 0.05;
+	min_jump_distance = 0.005;
 	min_rotation = 0.02;
 	max_rotation = 0.7;
 
+	last_fitness = 1;
+//	current_fitness = 1;
+
 	update_interval = 5;
 	update_time = ros::Time::now();
+
+	trans_que.resize(8);
+	trans_que_index = 0;
+
 
 }
 
@@ -52,6 +62,9 @@ void icp_laser::getLaserFromTopic(const sensor_msgs::LaserScan::Ptr _laser)
 
 	laser = *_laser;
 	we_have_laser = true;
+
+	laserToPCloud(*_laser, currentPose(), laser_cloud, max_laser_point_distance, min_laser_point_count);
+
 }
 
 void icp_laser::getMapFromTopic(const nav_msgs::OccupancyGrid::Ptr _map)
@@ -128,16 +141,16 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 
 		sensor_msgs::LaserScan::Ptr simulated = createSimulatedLaserScan(p);
 
-		pcl::PointCloud<pcl::PointXYZ>::Ptr real_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+		//pcl::PointCloud<pcl::PointXYZ>::Ptr real_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr simulated_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 		
-		laserToPCloud(laser, p, real_cloud, max_laser_point_distance, min_laser_point_count);
+		//laserToPCloud(laser, p, real_cloud, max_laser_point_distance, min_laser_point_count);
 		laserToPCloud(*simulated, p, simulated_cloud, max_simulated_point_distance, min_simulated_point_count);
 
 		//reducePoints(real_cloud, 0.02);
 		//reducePoints(simulated_cloud, 0.02);
 
-		real_cloud->header.frame_id = "/map";
+		//real_cloud->header.frame_id = "/map";
 		simulated_cloud->header.frame_id = "/map";
 
 		#ifdef PUBLISH_SIMULATED_LASER_CLOUD
@@ -145,16 +158,17 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		#endif
 
 		#ifdef PUBLISH_LASER_CLOUD
-		laser_cloud_publisher.publish(*real_cloud);
+		laser_cloud_publisher.publish(*laser_cloud);
+		//laser_cloud_publisher.publish(*real_cloud);
 		#endif
 
-		icp.setInputSource(real_cloud);
+		icp.setInputSource(laser_cloud);
 		icp.setInputTarget(simulated_cloud);
 
 		icp.setMaxCorrespondenceDistance (icp_max_correspondence_distance);
 		icp.setMaximumIterations (icp_max_iterations);
 		icp.setTransformationEpsilon (icp_transformation_epsilon);
-		icp.setEuclideanFitnessEpsilon (0.0001);
+		icp.setEuclideanFitnessEpsilon (1e-6);
 
 		pcl::PointCloud<pcl::PointXYZ> Final;
 
@@ -197,6 +211,27 @@ void icp_laser::updatePose(tf::Transform t)
 		) 
 		) 
 	{
+		
+		trans_que[trans_que_index] = t;
+		trans_que_index++;
+		if(trans_que_index == trans_que.size()) trans_que_index = 0;
+
+		double x, y, yaw;
+		x=y=yaw=0;
+
+		for(int i=0; i<trans_que.size(); i++)
+		{
+			x+=trans_que[i].getOrigin().x();
+			y+=trans_que[i].getOrigin().y();
+			yaw+=tf::getYaw(trans_que[i].getRotation());
+		}
+
+		x=x/double(trans_que.size());
+		y=y/double(trans_que.size());
+		yaw=yaw/double(trans_que.size());
+
+		t.setOrigin(tf::Vector3(x, y, 0));
+		t.setRotation(tf::createQuaternionFromRPY(0, 0, yaw));
 
 		update_time = ros::Time::now();
 

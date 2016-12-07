@@ -25,6 +25,8 @@
 
 #define PUBLISH_LASER_CLOUD
 
+
+
 class icp_laser
 {
 
@@ -36,6 +38,7 @@ class icp_laser
 
 	//Stores the laser scanner data taken from /scan topic
 	sensor_msgs::LaserScan laser;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr laser_cloud;
 
 	//It is true if we get laser data
 	bool we_have_laser;
@@ -78,6 +81,12 @@ class icp_laser
 
 	double update_interval;
 	ros::Time update_time;
+
+	double last_fitness;
+
+	std::vector<tf::Transform> trans_que;
+	unsigned char trans_que_index;
+
 
 public:
 	icp_laser();

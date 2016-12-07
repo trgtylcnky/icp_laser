@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 	ros::NodeHandle n;
 
 	icp_laser il;
-	il.setUpdateInterval(0.1);
+	il.setUpdateInterval(0.5);
 
 	ros::Rate r(5);
 
@@ -21,11 +21,12 @@ int main(int argc, char** argv)
 	{
 
 		r.sleep();
+		ros::spinOnce();
 
 		tf::Transform t = il.find(icp);
 		il.updatePose(t);
 
-		ros::spinOnce();
+		
 
 	}
 	
