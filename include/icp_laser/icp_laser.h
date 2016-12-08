@@ -17,6 +17,7 @@
 
 #include "occupancy_grid_utils/ray_tracer.h"
 
+#include "laser_geometry/laser_geometry.h"
 
 //Publish simulated laser scan for debug purposes
 #define PUBLISH_SIMULATED_LASER_SCAN

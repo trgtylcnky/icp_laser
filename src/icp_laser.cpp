@@ -63,6 +63,7 @@ void icp_laser::getLaserFromTopic(const sensor_msgs::LaserScan::Ptr _laser)
 	laser = *_laser;
 	we_have_laser = true;
 
+	//p is pose of laser respect to base
 	geometry_msgs::Pose p;
 	p.position.x = -laser_to_base.getOrigin().x();
 	p.position.z = -laser_to_base.getOrigin().z();
@@ -148,18 +149,11 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 	{
 		geometry_msgs::Pose p = currentPose();
 
+		//Simulated laser cloud is created on map
+		//according to current map -> base_laser_link frame
 		sensor_msgs::LaserScan::Ptr simulated = createSimulatedLaserScan(p);
-
-		//pcl::PointCloud<pcl::PointXYZ>::Ptr real_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr simulated_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-		
-		//laserToPCloud(laser, p, real_cloud, max_laser_point_distance, min_laser_point_count);
 		laserToPCloud(*simulated, p, simulated_cloud, max_simulated_point_distance, min_simulated_point_count);
-
-		//reducePoints(real_cloud, 0.02);
-		//reducePoints(simulated_cloud, 0.02);
-
-		//real_cloud->header.frame_id = "/map";
 		simulated_cloud->header.frame_id = "/map";
 
 		#ifdef PUBLISH_SIMULATED_LASER_CLOUD
@@ -168,7 +162,6 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 
 		#ifdef PUBLISH_LASER_CLOUD
 		laser_cloud_publisher.publish(*laser_cloud);
-		//laser_cloud_publisher.publish(*real_cloud);
 		#endif
 
 		icp.setInputSource(laser_cloud);
@@ -184,6 +177,8 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		tf::Matrix3x3 base_rot (base_transform.getRotation());
 		tf::Vector3 base_transl = base_transform.getOrigin();
 
+		//Converting current map -> base_laser_link transform to matrix
+		//This matrix is initial guess for icp
 		Eigen::Matrix4f tr_matrix = Eigen::Matrix4f::Identity();
 		tr_matrix(0,0) = base_rot[0].x();
 		tr_matrix(0,1) = base_rot[0].y();
@@ -199,7 +194,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		tr_matrix(1,3) = base_transl.y();
 		tr_matrix(2,3) = base_transl.z();
 
-		icp.align(Final, tr_matrix);
+		icp.align(Final, tr_matrix); //Perform icp with initial guess
 
 		#ifdef PUBLISH_LASER_CLOUD
 		pcl::PointCloud<pcl::PointXYZ> f;
@@ -212,11 +207,17 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 
 	tf::Transform t;
 
+	//if converge is found, return final transform
+	//else, return the old pose
 	if(icp.hasConverged())
 	{
 		matrixAsTransform (icp.getFinalTransformation(), t);
 	}
-
+	else 
+	{
+		t.setRotation(base_transform.getRotation());
+		t.setOrigin(base_transform.getOrigin());
+	}
 	
 	return t;
 
@@ -229,6 +230,7 @@ void icp_laser::updatePose(tf::Transform t)
 
 	ROS_INFO("time: %f", interval.toSec());
 
+	//calculate the difference between old and new transformations
 	double diff_x = t.getOrigin().x() - (base_transform*laser_to_base).getOrigin().x();
 	double diff_y = t.getOrigin().y() - (base_transform*laser_to_base).getOrigin().y();
 	double diff_a = tf::getYaw(t.getRotation()) - tf::getYaw((base_transform*laser_to_base).getRotation());
@@ -246,6 +248,7 @@ void icp_laser::updatePose(tf::Transform t)
 		diff_y,
 		diff_a);
 
+	//conditions for publishing new pose
 	if (interval.toSec() > update_interval &&
 		abs(diff_x)<max_jump_distance &&
 		abs(diff_y)<max_jump_distance &&
@@ -253,8 +256,8 @@ void icp_laser::updatePose(tf::Transform t)
 
 		(abs(diff_x)>min_jump_distance ||
 		abs(diff_y)>min_jump_distance ||
-		abs(diff_a) > min_rotation
-		) 
+		abs(diff_a) > min_rotation  )
+		
 		) 
 	{
 		
@@ -342,7 +345,11 @@ void icp_laser::laserToPCloud(
 		if(radius_threshold != 0 && scan.ranges[i]>radius_threshold)
 			continue;
 
+
 		pcl::PointXYZ p;
+
+		//Calclulate the point position
+		//assuming 2D space
 		double _yaw = laser_yaw + scan.angle_increment*i + scan.angle_min;
 		double x = pos.position.x + cos(_yaw)*scan.ranges[i];
 		double y = pos.position.y + sin(_yaw)*scan.ranges[i];
@@ -354,7 +361,8 @@ void icp_laser::laserToPCloud(
 	}
 
 	//since no one prevents me from having fun with recursion
-	if(result->points.size() < count_threshold) 
+	//if there is no enough point, repeat 
+	if(result->points.size() < count_threshold && radius_threshold<scan.range_max) 
 		laserToPCloud(scan, pos, result, radius_threshold + 0.5, count_threshold);
 
 
@@ -363,6 +371,10 @@ void icp_laser::laserToPCloud(
 void 
 icp_laser::matrixAsTransform (const Eigen::Matrix4f &out_mat,  tf::Transform& bt)
 {
+
+	//I copied this from SnapMapICP
+
+	
     double mv[12];
 
     mv[0] = out_mat (0, 0) ;
