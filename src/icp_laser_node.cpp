@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 	ros::NodeHandle n;
 
 	icp_laser il;
-	il.setUpdateInterval(0.5);
+	il.setUpdateInterval(1);
 
 	ros::Rate r(5);
 
