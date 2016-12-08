@@ -43,9 +43,6 @@ icp_laser::icp_laser()
 	min_rotation = 0.025;
 	max_rotation = 0.7;
 
-	last_fitness = 1;
-//	current_fitness = 1;
-
 	update_interval = 5;
 	update_time = ros::Time::now();
 
@@ -136,7 +133,7 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 tf::Transform
 icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 {
-	ROS_INFO("in: find");
+
 	
 
 	if(!we_have_laser)
@@ -260,54 +257,15 @@ void icp_laser::updatePose(tf::Transform t)
 		) 
 		) 
 	{
-		/*
-		trans_que[trans_que_index] = t;
-		trans_que_index++;
-		if(trans_que_index == trans_que.size()) trans_que_index = 0;
-
-		double x, y, yaw;
-		x=y=yaw=0;
-
-		for(int i=0; i<trans_que.size(); i++)
-		{
-			x+=trans_que[i].getOrigin().x();
-			y+=trans_que[i].getOrigin().y();
-			yaw+=tf::getYaw(trans_que[i].getRotation());
-		}
-
-		x=x/double(trans_que.size());
-		y=y/double(trans_que.size());
-		yaw=yaw/double(trans_que.size());
-
-		t.setOrigin(tf::Vector3(x, y, 0));
-		t.setRotation(tf::createQuaternionFromRPY(0, 0, yaw));
-*/
+		
 		update_time = ros::Time::now();
 
-		
-
-		//t =  base_transform * t;
-		//t = laser_to_base * t ;
 
 		geometry_msgs::PoseWithCovarianceStamped pose;
 
 
 		tf::poseTFToMsg (t, pose.pose.pose);
 
-		double yaw = tf::getYaw(t.getRotation()) ;
-		//pose.pose.pose.position.x +=  cos(yaw)*laser_to_base.getOrigin().x();
-		//pose.pose.pose.position.y +=  sin(yaw)*laser_to_base.getOrigin().x();
-/*
-		double yaw = tf::getYaw(t.getRotation()) ;
-
-		tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0, 0, yaw), pose.pose.pose.orientation);
-
-
-		pose.pose.pose.orientation.x = t.getRotation().getX();
-		pose.pose.pose.orientation.y = t.getRotation().getY();
-		pose.pose.pose.orientation.z = t.getRotation().getZ();
-		pose.pose.pose.orientation.w = t.getRotation().getW();
-*/
 
 		pose.pose.covariance[0] = pose_covariance_xx;
 		pose.pose.covariance[7] = pose_covariance_yy;
@@ -364,7 +322,7 @@ void icp_laser::laserToPCloud(
 	int count_threshold = 0)
 {
 
-	ROS_INFO("in: laserToPCloud");
+
 	const double angle_range = scan.angle_max - scan.angle_min;
 	const unsigned n = (unsigned) round(1+angle_range/scan.angle_increment);
 
@@ -400,9 +358,6 @@ void icp_laser::laserToPCloud(
 		laserToPCloud(scan, pos, result, radius_threshold + 0.5, count_threshold);
 
 
-	ROS_INFO("out: laserToPCloud");
-
-
 }
 
 void 
@@ -425,69 +380,5 @@ icp_laser::matrixAsTransform (const Eigen::Matrix4f &out_mat,  tf::Transform& bt
     tf::Vector3 origin(out_mat (0, 3),out_mat (1, 3),out_mat (2, 3));
 
     bt = tf::Transform(basis,origin);
-}
-
-geometry_msgs::PoseWithCovarianceStamped 
-icp_laser::poseFromICP(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ>& icp)
-{
-
-	tf::TransformListener tl;
-	tf::Transform t;
-	tf::StampedTransform base_transform;
-	try
-	{
-		tl.waitForTransform("/map", "/base_link", ros::Time(0), ros::Duration(10.0));
-		tl.lookupTransform("/map", "/base_link", ros::Time(0), base_transform);
-	}
-	catch (tf::TransformException ex)
-	{
-	    ROS_ERROR("%s", ex.what());
-	}
-
-	matrixAsTransform (icp.getFinalTransformation(),  t);
-
-	t = t * base_transform;
-
-	geometry_msgs::PoseWithCovarianceStamped pose;
-
-	pose.pose.pose.position.x = t.getOrigin().x();
-	pose.pose.pose.position.y = t.getOrigin().y();
-
-	pose.pose.pose.orientation.x = t.getRotation().getX();
-	pose.pose.pose.orientation.y = t.getRotation().getY();
-	pose.pose.pose.orientation.z = t.getRotation().getZ();
-	pose.pose.pose.orientation.w = t.getRotation().getW();
-
-
-	pose.pose.covariance[0] = 0.4;
-	pose.pose.covariance[7] = 0.4;
-	pose.pose.covariance[35] = 0.1;
-
-	return pose;
-
-}
-
-void icp_laser::reducePoints(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, float dist)
-{
-	std::vector<pcl::PointXYZ> p;
-
-	p.push_back(cloud->points[0]);
-
-	for(int i=1; i < cloud->points.size(); i++)
-	{
-		if(cloud->points[i].x > p[i-1].x + dist
-			|| cloud->points[i].x < p[i-1].x - dist
-			|| cloud->points[i].y > p[i-1].y + dist
-			|| cloud->points[i].y < p[i-1].y - dist)
-		{
-			p.push_back(cloud->points[i]);
-		}
-	}
-
-	cloud->points.resize(p.size());
-	for(int i=0; i<p.size(); i++)
-	{
-		cloud->points[i] = p[i];
-	}
 }
 

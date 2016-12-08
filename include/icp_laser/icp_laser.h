@@ -52,6 +52,7 @@ class icp_laser
 	ros::Subscriber laser_subscriber;
 	ros::Publisher pose_publisher;
 
+	//Publishing data for visualization purposes
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 	ros::Publisher sim_laser_publisher;
 	#endif
@@ -64,28 +65,27 @@ class icp_laser
 	ros::Publisher laser_cloud_publisher;
 	#endif
 
-
+	//Neglect laser data far away from that distance
 	double max_simulated_point_distance;
 	int min_simulated_point_count;
-
 	double max_laser_point_distance;
 	int min_laser_point_count;
 
-
+	//ICP parameters
 	double icp_max_correspondence_distance;
 	unsigned int icp_max_iterations;
 	double icp_transformation_epsilon;
 
-	double max_jump_distance;
-	double min_jump_distance;
-	double max_rotation;
+	//Pose update parameters
+	double max_jump_distance; //Do not publish the pose if it is too far away
+	double min_jump_distance; //No need to publish new pose if it is too close
+	double max_rotation; //Same for rotation
 	double min_rotation;
 
-	double update_interval;
-	ros::Time update_time;
+	double update_interval;  //Limit the update frequency of pose
+	ros::Time update_time;  //Holds the last time new pose published
 
-	double last_fitness;
-
+	//covariance in published pose (PoseWithCovarianceStamped)
 	double pose_covariance_xx;
 	double pose_covariance_yy;
 	double pose_covariance_aa;
@@ -96,24 +96,31 @@ class icp_laser
 public:
 	icp_laser();
 
+	//Create simulated laser data as if robot is at give pose
 	sensor_msgs::LaserScan::Ptr createSimulatedLaserScan(geometry_msgs::Pose&);
+
+	//Map callback
 	void getMapFromTopic(const nav_msgs::OccupancyGrid::Ptr);
+	//Laser scan callback
 	void getLaserFromTopic(const sensor_msgs::LaserScan::Ptr);
+
+	//get the current laser pose
 	geometry_msgs::Pose currentPose();
+
+	//performs the ICP algorithm and return the final transformation
 	tf::Transform find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &);
+
 
 	void setICPParameters(double, unsigned int, double);
 	void setLaserCloudParameters(double, int, double, int);
-
 	void setJumpParameters(double, double, double, double);
-
 	void setPoseCovariance(double, double, double);
-
 	void setUpdateInterval(double);
 
+	//Update the robot pose according to the given transform
 	void updatePose(tf::Transform);
 
-
+	//convert laser scan to point cloud, laser scanner pose is given
 	void laserToPCloud(
 		sensor_msgs::LaserScan&, 
 		geometry_msgs::Pose, 
@@ -121,17 +128,8 @@ public:
 		double,
 		int);
 
-
-	void 
-	matrixAsTransform (const Eigen::Matrix4f&,  tf::Transform&);
-
-
-	geometry_msgs::PoseWithCovarianceStamped 
-	poseFromICP(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ>&);
-
-
-	void reducePoints(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, float dist);
-
+	//convert transformation matrix to tf::Traansform object
+	void matrixAsTransform (const Eigen::Matrix4f&,  tf::Transform&);
 };
 
 
