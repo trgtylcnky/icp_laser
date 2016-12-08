@@ -39,8 +39,8 @@ icp_laser::icp_laser()
 	icp_transformation_epsilon = 1e-6;
 
 	max_jump_distance = 0.8;
-	min_jump_distance = 0.02;
-	min_rotation = 0.02;
+	min_jump_distance = 0.1;
+	min_rotation = 0.025;
 	max_rotation = 0.7;
 
 	last_fitness = 1;
@@ -52,8 +52,8 @@ icp_laser::icp_laser()
 	tf_listener.waitForTransform( "/base_laser_link", "base_link", ros::Time(0), ros::Duration(10.0));
 	tf_listener.lookupTransform( "/base_laser_link", "base_link", ros::Time(0), laser_to_base);
 
-	pose_covariance_xx = 0.025;
-	pose_covariance_yy = 0.025;
+	pose_covariance_xx = 0.02;
+	pose_covariance_yy = 0.02;
 	pose_covariance_aa = 0.005;
 
 }
@@ -231,22 +231,32 @@ void icp_laser::updatePose(tf::Transform t)
 	ros::Duration interval = ros::Time::now() - update_time;
 
 	ROS_INFO("time: %f", interval.toSec());
+
+	double diff_x = t.getOrigin().x() - (base_transform*laser_to_base).getOrigin().x();
+	double diff_y = t.getOrigin().y() - (base_transform*laser_to_base).getOrigin().y();
+	double diff_a = tf::getYaw(t.getRotation()) - tf::getYaw((base_transform*laser_to_base).getRotation());
+	
+	/*
 	ROS_INFO("%f %f %f", 
 		t.getOrigin().x(),
 		t.getOrigin().y(),
 		tf::getYaw(t.getRotation()));
 
-	tf::Transform diff = t.inverseTimes(base_transform);
 
+*/
+	ROS_INFO("%f %f %f", 
+		diff_x,
+		diff_y,
+		diff_a);
 
 	if (interval.toSec() > update_interval &&
-		abs(diff.getOrigin().x())<max_jump_distance &&
-		abs(diff.getOrigin().y())<max_jump_distance &&
-		abs(tf::getYaw(diff.getRotation())) < max_rotation &&
+		abs(diff_x)<max_jump_distance &&
+		abs(diff_y)<max_jump_distance &&
+		abs(diff_a) < max_rotation &&
 
-		(abs(diff.getOrigin().x())>min_jump_distance ||
-		abs(diff.getOrigin().y())>min_jump_distance ||
-		abs(tf::getYaw(diff.getRotation())) > min_rotation
+		(abs(diff_x)>min_jump_distance ||
+		abs(diff_y)>min_jump_distance ||
+		abs(diff_a) > min_rotation
 		) 
 		) 
 	{
