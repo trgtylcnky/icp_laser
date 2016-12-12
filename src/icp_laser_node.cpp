@@ -1,7 +1,5 @@
 #include "icp_laser/icp_laser.h"
 
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
-
 
 int main(int argc, char** argv)
 {
@@ -10,6 +8,8 @@ int main(int argc, char** argv)
 
 	icp_laser il;
 	il.setUpdateInterval(1);
+
+	il.setICPParameters(0.5, 2500, 1e-8, 1e-6);
 
 	ros::Rate r(5);
 
@@ -23,7 +23,7 @@ int main(int argc, char** argv)
 		r.sleep();
 		ros::spinOnce();
 
-		tf::Transform t = il.find(icp);
+		TransformWithFitness t = il.find(icp);
 		il.updatePose(t);
 
 		

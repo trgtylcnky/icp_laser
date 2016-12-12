@@ -26,7 +26,11 @@
 
 #define PUBLISH_LASER_CLOUD
 
-
+struct TransformWithFitness
+{
+	tf::Transform transform;
+	double fitness;
+};
 
 class icp_laser
 {
@@ -64,6 +68,7 @@ class icp_laser
 
 	#ifdef PUBLISH_LASER_CLOUD
 	ros::Publisher laser_cloud_publisher;
+	ros::Publisher transformed_laser_cloud_publisher;
 	#endif
 
 	//Neglect laser data far away from that distance
@@ -76,6 +81,11 @@ class icp_laser
 	double icp_max_correspondence_distance;
 	unsigned int icp_max_iterations;
 	double icp_transformation_epsilon;
+	double icp_euclidean_distance_epsilon;
+
+	double inlier_distance;
+
+	double fitness_threshold;
 
 	//Pose update parameters
 	double max_jump_distance; //Do not publish the pose if it is too far away
@@ -90,6 +100,8 @@ class icp_laser
 	double pose_covariance_xx;
 	double pose_covariance_yy;
 	double pose_covariance_aa;
+
+	pcl::KdTree<pcl::PointXYZ>::Ptr target_tree;
 
 
 
@@ -109,17 +121,18 @@ public:
 	geometry_msgs::Pose currentPose();
 
 	//performs the ICP algorithm and return the final transformation
-	tf::Transform find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &);
+	TransformWithFitness find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &);
 
 
-	void setICPParameters(double, unsigned int, double);
+	void setICPParameters(double, unsigned int, double, double);
 	void setLaserCloudParameters(double, int, double, int);
 	void setJumpParameters(double, double, double, double);
 	void setPoseCovariance(double, double, double);
 	void setUpdateInterval(double);
+	void setInlierThreshold(double);
 
 	//Update the robot pose according to the given transform
-	void updatePose(tf::Transform);
+	void updatePose(TransformWithFitness);
 
 	//convert laser scan to point cloud, laser scanner pose is given
 	void laserToPCloud(
@@ -139,3 +152,4 @@ double abs(double d)
 	if(d < 0) return -d;
 	else return d;
 }
+

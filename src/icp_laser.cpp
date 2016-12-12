@@ -23,23 +23,29 @@ icp_laser::icp_laser()
 
 	#ifdef PUBLISH_LASER_CLOUD
 	laser_cloud_publisher = nodeHandle.advertise<pcl::PointCloud<pcl::PointXYZ> >("/icp_laser/laser_cloud", 1000);
+	transformed_laser_cloud_publisher= nodeHandle.advertise<pcl::PointCloud<pcl::PointXYZ> >("/icp_laser/transformed_laser_cloud", 1000);
 	#endif
 
 	laser_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new (pcl::PointCloud<pcl::PointXYZ>));
 	laser_cloud->header.frame_id = "/map";
+
+	target_tree = pcl::KdTree<pcl::PointXYZ>::Ptr(new (pcl::KdTreeFLANN<pcl::PointXYZ>));
 	
-	max_simulated_point_distance = 3;
+	max_simulated_point_distance = 8;
 	min_simulated_point_count = 200;
 
 	max_laser_point_distance = 3;
 	min_laser_point_count = 200;
 
 	icp_max_correspondence_distance = 0.5;
-	icp_max_iterations = 2500;
-	icp_transformation_epsilon = 1e-6;
+	icp_max_iterations = 25;
+	icp_transformation_epsilon = 1e-8;
+	icp_euclidean_distance_epsilon = 1e-5;
+
+	inlier_distance = 0.1;
 
 	max_jump_distance = 0.8;
-	min_jump_distance = 0.1;
+	min_jump_distance = 0.03;
 	min_rotation = 0.025;
 	max_rotation = 0.7;
 
@@ -52,6 +58,8 @@ icp_laser::icp_laser()
 	pose_covariance_xx = 0.02;
 	pose_covariance_yy = 0.02;
 	pose_covariance_aa = 0.005;
+
+	fitness_threshold = 0.05;
 
 }
 
@@ -117,10 +125,14 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 
 	sensor_msgs::LaserScan::Ptr sml;
 
+	sensor_msgs::LaserScan scanner_info = laser;
+	//scanner_info.angle_min = - 3.14;
+//	scanner_info.angle_max = 3.14;
+
 	if(we_have_map && we_have_laser)
 	{
 
-		sml = occupancy_grid_utils::simulateRangeScan(map, pos, laser, false);
+		sml = occupancy_grid_utils::simulateRangeScan(map, pos, scanner_info, false);
 
 		#ifdef PUBLISH_SIMULATED_LASER_SCAN
 		sim_laser_publisher.publish(*sml);
@@ -131,11 +143,11 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 
 }
 
-tf::Transform
+TransformWithFitness
 icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 {
 
-	
+	TransformWithFitness twf;
 
 	if(!we_have_laser)
 	{
@@ -156,11 +168,14 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		laserToPCloud(*simulated, p, simulated_cloud, max_simulated_point_distance, min_simulated_point_count);
 		simulated_cloud->header.frame_id = "/map";
 
+
+
 		#ifdef PUBLISH_SIMULATED_LASER_CLOUD
 		sim_laser_cloud_publisher.publish(*simulated_cloud);
 		#endif
 
 		#ifdef PUBLISH_LASER_CLOUD
+		laser_cloud->header.frame_id = "/base_link";
 		laser_cloud_publisher.publish(*laser_cloud);
 		#endif
 
@@ -170,7 +185,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		icp.setMaxCorrespondenceDistance (icp_max_correspondence_distance);
 		icp.setMaximumIterations (icp_max_iterations);
 		icp.setTransformationEpsilon (icp_transformation_epsilon);
-		icp.setEuclideanFitnessEpsilon (1e-6);
+		icp.setEuclideanFitnessEpsilon (icp_euclidean_distance_epsilon);
 
 		pcl::PointCloud<pcl::PointXYZ> Final;
 
@@ -199,9 +214,22 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		#ifdef PUBLISH_LASER_CLOUD
 		pcl::PointCloud<pcl::PointXYZ> f;
 		pcl::transformPointCloud (*laser_cloud, f, icp.getFinalTransformation());
-
-		laser_cloud_publisher.publish(f);
+		f.header.frame_id = "/map";
+		transformed_laser_cloud_publisher.publish(f);
 		#endif
+
+		std::vector<int> nn_indices (1);
+		std::vector<float> nn_sqr_dists (1);
+
+		target_tree->setInputCloud(simulated_cloud);
+		int num_of_inliers = 0;
+		for (int i = 0; i<Final.points.size(); i++)
+		{
+			if(target_tree->radiusSearch(Final.points[i], inlier_distance, nn_indices, nn_sqr_dists, 1) != 0)
+				num_of_inliers++;
+		}
+
+		twf.fitness = double(num_of_inliers) / double(laser_cloud->points.size());
 
 	}
 
@@ -218,13 +246,17 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		t.setRotation(base_transform.getRotation());
 		t.setOrigin(base_transform.getOrigin());
 	}
+
+	twf.transform = t;
+	twf.fitness = icp.getFitnessScore();
 	
-	return t;
+	return twf;
 
 }
 
-void icp_laser::updatePose(tf::Transform t)
+void icp_laser::updatePose(TransformWithFitness twf)
 {
+	tf::Transform t = twf.transform;
 
 	ros::Duration interval = ros::Time::now() - update_time;
 
@@ -243,13 +275,17 @@ void icp_laser::updatePose(tf::Transform t)
 
 
 */
+
+
 	ROS_INFO("%f %f %f", 
 		diff_x,
 		diff_y,
 		diff_a);
 
 	//conditions for publishing new pose
-	if (interval.toSec() > update_interval &&
+	if (
+		twf.fitness < fitness_threshold &&
+		interval.toSec() > update_interval &&
 		abs(diff_x)<max_jump_distance &&
 		abs(diff_y)<max_jump_distance &&
 		abs(diff_a) < max_rotation &&
@@ -260,7 +296,9 @@ void icp_laser::updatePose(tf::Transform t)
 		
 		) 
 	{
-		
+
+		ROS_INFO("Fitness Score: %f", twf.fitness);
+
 		update_time = ros::Time::now();
 
 
@@ -286,11 +324,12 @@ void icp_laser::updatePose(tf::Transform t)
 }
 
 
-void icp_laser::setICPParameters(double a, unsigned int b, double c)
+void icp_laser::setICPParameters(double a, unsigned int b, double c, double d)
 {
 	icp_max_correspondence_distance = a;
 	icp_max_iterations = b;
 	icp_transformation_epsilon = c;
+	icp_euclidean_distance_epsilon = d;
 }
 void icp_laser::setLaserCloudParameters(double a, int b, double c, int d)
 {
@@ -315,6 +354,10 @@ void icp_laser::setPoseCovariance(double x, double y, double a)
 	pose_covariance_aa = a;
 	pose_covariance_yy = y;
 	pose_covariance_xx = x;
+}
+void icp_laser::setInlierThreshold(double i)
+{
+	inlier_distance = i;
 }
 
 void icp_laser::laserToPCloud(
