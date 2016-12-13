@@ -126,6 +126,7 @@ include_directories(
 ## Declare a C++ library
  add_library(icp_laser
    src/icp_laser.cpp
+   src/find.cpp
  )
 
 ## Add cmake target dependencies of the library

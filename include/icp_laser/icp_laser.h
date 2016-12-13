@@ -1,4 +1,7 @@
 
+#ifndef ICP_LASER_H_DEFINED
+#define ICP_LASER_H_DEFINED
+
 
 #include "ros/ros.h"
 
@@ -73,8 +76,10 @@ class icp_laser
 
 	//Neglect laser data far away from that distance
 	double max_simulated_point_distance;
+	double max_simulated_point_width;
 	int min_simulated_point_count;
 	double max_laser_point_distance;
+	double max_laser_point_width;
 	int min_laser_point_count;
 
 	//ICP parameters
@@ -125,11 +130,13 @@ public:
 
 
 	void setICPParameters(double, unsigned int, double, double);
-	void setLaserCloudParameters(double, int, double, int);
+	void setLaserCloudLimits(double, double, int);
+	void setSimulatedCloudLimits(double, double, int);
 	void setJumpParameters(double, double, double, double);
 	void setPoseCovariance(double, double, double);
 	void setUpdateInterval(double);
 	void setInlierThreshold(double);
+	void setFitnessThreshold(double);
 
 	//Update the robot pose according to the given transform
 	void updatePose(TransformWithFitness);
@@ -144,12 +151,10 @@ public:
 
 	//convert transformation matrix to tf::Traansform object
 	void matrixAsTransform (const Eigen::Matrix4f&,  tf::Transform&);
+
 };
 
 
-double abs(double d)
-{
-	if(d < 0) return -d;
-	else return d;
-}
 
+
+#endif

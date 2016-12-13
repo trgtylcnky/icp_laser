@@ -32,9 +32,11 @@ icp_laser::icp_laser()
 	target_tree = pcl::KdTree<pcl::PointXYZ>::Ptr(new (pcl::KdTreeFLANN<pcl::PointXYZ>));
 	
 	max_simulated_point_distance = 8;
+	max_simulated_point_width = 2;
 	min_simulated_point_count = 200;
 
-	max_laser_point_distance = 3;
+	max_laser_point_distance = 8;
+	max_laser_point_width = 1;
 	min_laser_point_count = 200;
 
 	icp_max_correspondence_distance = 0.5;
@@ -51,15 +53,20 @@ icp_laser::icp_laser()
 
 	update_interval = 5;
 	update_time = ros::Time::now();
-
-	tf_listener.waitForTransform( "/base_laser_link", "base_link", ros::Time(0), ros::Duration(10.0));
-	tf_listener.lookupTransform( "/base_laser_link", "base_link", ros::Time(0), laser_to_base);
-
-	pose_covariance_xx = 0.02;
-	pose_covariance_yy = 0.02;
+	try
+	{
+		tf_listener.waitForTransform( "/base_laser_link", "base_link", ros::Time(0), ros::Duration(10.0));
+		tf_listener.lookupTransform( "/base_laser_link", "base_link", ros::Time(0), laser_to_base);
+	}
+	catch (tf::TransformException ex)
+	{
+		ROS_ERROR("%s", ex.what());
+	}
+	pose_covariance_xx = 0.01;
+	pose_covariance_yy = 0.01;
 	pose_covariance_aa = 0.005;
 
-	fitness_threshold = 0.05;
+	fitness_threshold = 0.001;
 
 }
 
@@ -77,7 +84,7 @@ void icp_laser::getLaserFromTopic(const sensor_msgs::LaserScan::Ptr _laser)
 	p.position.z = -laser_to_base.getOrigin().z();
 	p.orientation.w =1;
 
-	laserToPCloud(*_laser, p, laser_cloud, max_laser_point_distance, min_laser_point_count);
+	laserToPCloud(*_laser, p, laser_cloud, max_laser_point_width, min_laser_point_count);
 
 	try
 	{
@@ -143,122 +150,15 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 
 }
 
-TransformWithFitness
-icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
-{
 
-	TransformWithFitness twf;
-
-	if(!we_have_laser)
-	{
-		ROS_ERROR("Trying to find icp without laser data");
-	}
-	if(!we_have_map)
-	{
-		ROS_ERROR("Trying to find icp without map data");
-	}
-	if(we_have_map && we_have_laser)
-	{
-		geometry_msgs::Pose p = currentPose();
-
-		//Simulated laser cloud is created on map
-		//according to current map -> base_laser_link frame
-		sensor_msgs::LaserScan::Ptr simulated = createSimulatedLaserScan(p);
-		pcl::PointCloud<pcl::PointXYZ>::Ptr simulated_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-		laserToPCloud(*simulated, p, simulated_cloud, max_simulated_point_distance, min_simulated_point_count);
-		simulated_cloud->header.frame_id = "/map";
-
-
-
-		#ifdef PUBLISH_SIMULATED_LASER_CLOUD
-		sim_laser_cloud_publisher.publish(*simulated_cloud);
-		#endif
-
-		#ifdef PUBLISH_LASER_CLOUD
-		laser_cloud->header.frame_id = "/base_link";
-		laser_cloud_publisher.publish(*laser_cloud);
-		#endif
-
-		icp.setInputSource(laser_cloud);
-		icp.setInputTarget(simulated_cloud);
-
-		icp.setMaxCorrespondenceDistance (icp_max_correspondence_distance);
-		icp.setMaximumIterations (icp_max_iterations);
-		icp.setTransformationEpsilon (icp_transformation_epsilon);
-		icp.setEuclideanFitnessEpsilon (icp_euclidean_distance_epsilon);
-
-		pcl::PointCloud<pcl::PointXYZ> Final;
-
-		tf::Matrix3x3 base_rot (base_transform.getRotation());
-		tf::Vector3 base_transl = base_transform.getOrigin();
-
-		//Converting current map -> base_laser_link transform to matrix
-		//This matrix is initial guess for icp
-		Eigen::Matrix4f tr_matrix = Eigen::Matrix4f::Identity();
-		tr_matrix(0,0) = base_rot[0].x();
-		tr_matrix(0,1) = base_rot[0].y();
-		tr_matrix(0,2) = base_rot[0].z();
-		tr_matrix(1,0) = base_rot[1].x();
-		tr_matrix(1,1) = base_rot[1].y();
-		tr_matrix(1,2) = base_rot[1].z();
-		tr_matrix(2,0) = base_rot[2].x();
-		tr_matrix(2,1) = base_rot[2].y();
-		tr_matrix(2,2) = base_rot[2].z();
-
-		tr_matrix(0,3) = base_transl.x();
-		tr_matrix(1,3) = base_transl.y();
-		tr_matrix(2,3) = base_transl.z();
-
-		icp.align(Final, tr_matrix); //Perform icp with initial guess
-
-		#ifdef PUBLISH_LASER_CLOUD
-		pcl::PointCloud<pcl::PointXYZ> f;
-		pcl::transformPointCloud (*laser_cloud, f, icp.getFinalTransformation());
-		f.header.frame_id = "/map";
-		transformed_laser_cloud_publisher.publish(f);
-		#endif
-
-		std::vector<int> nn_indices (1);
-		std::vector<float> nn_sqr_dists (1);
-
-		target_tree->setInputCloud(simulated_cloud);
-		int num_of_inliers = 0;
-		for (int i = 0; i<Final.points.size(); i++)
-		{
-			if(target_tree->radiusSearch(Final.points[i], inlier_distance, nn_indices, nn_sqr_dists, 1) != 0)
-				num_of_inliers++;
-		}
-
-		twf.fitness = double(num_of_inliers) / double(laser_cloud->points.size());
-
-	}
-
-	tf::Transform t;
-
-	//if converge is found, return final transform
-	//else, return the old pose
-	if(icp.hasConverged())
-	{
-		matrixAsTransform (icp.getFinalTransformation(), t);
-	}
-	else 
-	{
-		t.setRotation(base_transform.getRotation());
-		t.setOrigin(base_transform.getOrigin());
-	}
-
-	twf.transform = t;
-	twf.fitness = icp.getFitnessScore();
-	
-	return twf;
-
-}
 
 void icp_laser::updatePose(TransformWithFitness twf)
 {
 	tf::Transform t = twf.transform;
 
 	ros::Duration interval = ros::Time::now() - update_time;
+
+
 
 	ROS_INFO("time: %f", interval.toSec());
 
@@ -281,23 +181,25 @@ void icp_laser::updatePose(TransformWithFitness twf)
 		diff_x,
 		diff_y,
 		diff_a);
+	ROS_INFO("Fitness Score: %f ", twf.fitness);
+
+	if(twf.fitness > fitness_threshold) ROS_INFO("Not fit Enough!!");
 
 	//conditions for publishing new pose
-	if (
-		twf.fitness < fitness_threshold &&
+	else if (
 		interval.toSec() > update_interval &&
-		abs(diff_x)<max_jump_distance &&
-		abs(diff_y)<max_jump_distance &&
-		abs(diff_a) < max_rotation &&
+		fabs(diff_x)<max_jump_distance &&
+		fabs(diff_y)<max_jump_distance &&
+		fabs(diff_a) < max_rotation &&
 
-		(abs(diff_x)>min_jump_distance ||
-		abs(diff_y)>min_jump_distance ||
-		abs(diff_a) > min_rotation  )
+		(fabs(diff_x)>min_jump_distance ||
+		fabs(diff_y)>min_jump_distance ||
+		fabs(diff_a) > min_rotation  )
 		
 		) 
 	{
 
-		ROS_INFO("Fitness Score: %f", twf.fitness);
+		
 
 		update_time = ros::Time::now();
 
@@ -331,12 +233,17 @@ void icp_laser::setICPParameters(double a, unsigned int b, double c, double d)
 	icp_transformation_epsilon = c;
 	icp_euclidean_distance_epsilon = d;
 }
-void icp_laser::setLaserCloudParameters(double a, int b, double c, int d)
+void icp_laser::setLaserCloudLimits(double a, double b, int c)
+{
+	max_laser_point_distance = a;
+	max_laser_point_width = b;
+	min_laser_point_count = c;
+}
+void icp_laser::setSimulatedCloudLimits(double a, double b, int c)
 {
 	max_simulated_point_distance = a;
-	min_simulated_point_count = b;
-	max_simulated_point_distance = c;
-	min_simulated_point_count = d;
+	max_simulated_point_width = b;
+	min_simulated_point_count = c;
 }
 void icp_laser::setJumpParameters(double a, double b, double c, double d)
 {
@@ -359,12 +266,16 @@ void icp_laser::setInlierThreshold(double i)
 {
 	inlier_distance = i;
 }
+void icp_laser::setFitnessThreshold(double f)
+{
+	fitness_threshold = f;
+}
 
 void icp_laser::laserToPCloud(
 	sensor_msgs::LaserScan& scan, 
 	geometry_msgs::Pose pos, 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr& result, 
-	double radius_threshold = 0,
+	double width_threshold = 0,
 	int count_threshold = 0)
 {
 
@@ -385,17 +296,24 @@ void icp_laser::laserToPCloud(
 
 	for (int i=0; i<n; i++)
 	{
-		if(radius_threshold != 0 && scan.ranges[i]>radius_threshold)
-			continue;
+		
 
 
 		pcl::PointXYZ p;
 
 		//Calclulate the point position
 		//assuming 2D space
-		double _yaw = laser_yaw + scan.angle_increment*i + scan.angle_min;
-		double x = pos.position.x + cos(_yaw)*scan.ranges[i];
-		double y = pos.position.y + sin(_yaw)*scan.ranges[i];
+		double angle = scan.angle_increment*i + scan.angle_min;
+		double local_y = sin(angle)*scan.ranges[i];
+		double local_x = cos(angle)*scan.ranges[i];
+
+
+		if(width_threshold != 0 && (fabs(local_y) > width_threshold/2 || local_x < 0 )) continue;
+
+		double x = pos.position.x + cos(laser_yaw + angle)*scan.ranges[i];
+		double y = pos.position.y + sin(laser_yaw + angle)*scan.ranges[i];
+
+
 		p.x = x;
 		p.y = y;
 		p.z = pos.position.z;
@@ -403,12 +321,13 @@ void icp_laser::laserToPCloud(
 		result->points.push_back(p);
 	}
 
+/*
 	//since no one prevents me from having fun with recursion
 	//if there is no enough point, repeat 
 	if(result->points.size() < count_threshold && radius_threshold<scan.range_max) 
-		laserToPCloud(scan, pos, result, radius_threshold + 0.5, count_threshold);
+		laserToPCloud(scan, pos, result, width_threshold + 0.5, count_threshold);
 
-
+*/
 }
 
 void 

@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 	icp_laser il;
 	il.setUpdateInterval(1);
 
-	il.setICPParameters(0.5, 2500, 1e-8, 1e-6);
+	il.setICPParameters(0.25, 2500, 1e-9, 1e-6);
 
 	ros::Rate r(5);
 
