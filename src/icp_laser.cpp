@@ -29,7 +29,7 @@ icp_laser::icp_laser()
 	laser_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new (pcl::PointCloud<pcl::PointXYZ>));
 	laser_cloud->header.frame_id = "/map";
 
-	target_tree = pcl::KdTree<pcl::PointXYZ>::Ptr(new (pcl::KdTreeFLANN<pcl::PointXYZ>));
+
 	
 	max_simulated_point_distance = 8;
 	max_simulated_point_width = 2;
@@ -68,8 +68,30 @@ icp_laser::icp_laser()
 
 	fitness_threshold = 0.001;
 
+	dynamic_reconfigure::Server<icp_laser_config::ICP_LaserConfig>::CallbackType cb;
+
+	reconfigure_server = new dynamic_reconfigure::Server<icp_laser_config::ICP_LaserConfig>(ros::NodeHandle("~"));
+	cb = boost::bind(&icp_laser::dynamic_reconfigure_callback, this, _1, _2);
+	reconfigure_server->setCallback(cb);
+
 }
 
+icp_laser::~icp_laser()
+{
+	delete reconfigure_server;
+
+}
+
+void icp_laser::dynamic_reconfigure_callback(icp_laser_config::ICP_LaserConfig &config, uint32_t level)
+{
+	boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
+
+	icp_max_iterations = config.icp_max_iterations;
+	icp_max_correspondence_distance = config.icp_max_correspondence_distance;
+	max_laser_point_width = config.max_laser_point_width;
+	max_simulated_point_width = config.max_simulated_point_width;
+
+}
 
 
 void icp_laser::getLaserFromTopic(const sensor_msgs::LaserScan::Ptr _laser)
