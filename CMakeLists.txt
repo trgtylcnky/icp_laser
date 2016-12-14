@@ -12,12 +12,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   tf
   dynamic_reconfigure
+  occupancy_grid_utils
 )
 
 ## System dependencies are found with CMake's conventions
  find_package(Boost REQUIRED COMPONENTS system)
 
-find_package(occupancy_grid_utils REQUIRED)
+#find_package(occupancy_grid_utils REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -106,7 +107,7 @@ find_package(occupancy_grid_utils REQUIRED)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES icp_laser
-  CATKIN_DEPENDS geometry_msgs nav_msgs pcl_ros roscpp tf dynamic_reconfigure
+  CATKIN_DEPENDS geometry_msgs sensor_msgs nav_msgs pcl_ros roscpp tf dynamic_reconfigure
 #  DEPENDS system_lib
 )
 
@@ -146,6 +147,10 @@ add_dependencies(icp_laser ${PROJECT_NAME}_gencfg)
 
 add_dependencies(icp_laser_node ${PROJECT_NAME}_gencfg)
 
+target_link_libraries(icp_laser
+  grid_utils
+  ${catkin_LIBRARIES}
+)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(icp_laser_node
