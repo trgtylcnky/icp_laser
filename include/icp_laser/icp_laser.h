@@ -12,7 +12,6 @@
 
 #include "tf/transform_listener.h"
 
-#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/registration/icp.h>
@@ -22,12 +21,18 @@
 
 #include "laser_geometry/laser_geometry.h"
 
+#include "dynamic_reconfigure/server.h"
+#include "icp_laser/ICP_LaserConfig.h"
+
+
 //Publish simulated laser scan for debug purposes
 #define PUBLISH_SIMULATED_LASER_SCAN
 
 #define PUBLISH_SIMULATED_LASER_CLOUD
 
 #define PUBLISH_LASER_CLOUD
+
+
 
 struct TransformWithFitness
 {
@@ -106,13 +111,14 @@ class icp_laser
 	double pose_covariance_yy;
 	double pose_covariance_aa;
 
-	pcl::KdTree<pcl::PointXYZ>::Ptr target_tree;
 
 
-
+	dynamic_reconfigure::Server<icp_laser_config::ICP_LaserConfig> *reconfigure_server;
+	boost::recursive_mutex configuration_mutex_;
 
 public:
 	icp_laser();
+	~icp_laser();
 
 	//Create simulated laser data as if robot is at give pose
 	sensor_msgs::LaserScan::Ptr createSimulatedLaserScan(geometry_msgs::Pose&);
@@ -127,6 +133,8 @@ public:
 
 	//performs the ICP algorithm and return the final transformation
 	TransformWithFitness find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &);
+
+	void dynamic_reconfigure_callback(icp_laser_config::ICP_LaserConfig &config, uint32_t level);
 
 
 	void setICPParameters(double, unsigned int, double, double);

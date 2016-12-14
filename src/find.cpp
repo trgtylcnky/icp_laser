@@ -84,6 +84,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		std::vector<int> nn_indices (1);
 		std::vector<float> nn_sqr_dists (1);
 
+/*
 		target_tree->setInputCloud(simulated_cloud);
 		int num_of_inliers = 0;
 		for (int i = 0; i<Final.points.size(); i++)
@@ -93,7 +94,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 		}
 
 		twf.fitness = double(num_of_inliers) / double(laser_cloud->points.size());
-
+*/
 	}
 
 	tf::Transform t;
