@@ -88,9 +88,21 @@ void icp_laser::dynamic_reconfigure_callback(icp_laser_config::ICP_LaserConfig &
 
 	icp_max_iterations = config.icp_max_iterations;
 	icp_max_correspondence_distance = config.icp_max_correspondence_distance;
+	icp_transformation_epsilon = config.icp_transformation_epsilon;
+	icp_euclidean_distance_epsilon = config.icp_euclidean_distance_epsilon;
+
 	max_laser_point_width = config.max_laser_point_width;
 	max_simulated_point_width = config.max_simulated_point_width;
 
+	pose_covariance_aa = config.pose_covariance_aa;
+	pose_covariance_yy = config.pose_covariance_loc;
+	pose_covariance_xx = config.pose_covariance_loc;
+
+	update_interval = config.update_interval;
+
+	fitness_threshold = config.fitness_threshold;
+
+	
 }
 
 
