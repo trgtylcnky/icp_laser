@@ -24,6 +24,8 @@
 #include "dynamic_reconfigure/server.h"
 #include "icp_laser/ICP_LaserConfig.h"
 
+#include <csm/csm_all.h>
+
 
 //Publish simulated laser scan for debug purposes
 #define PUBLISH_SIMULATED_LASER_SCAN
@@ -68,6 +70,7 @@ class icp_laser
 	//Publishing data for visualization purposes
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 	ros::Publisher sim_laser_publisher;
+	ros::Publisher laser_publisher;
 	#endif
 
 	#ifdef PUBLISH_SIMULATED_LASER_CLOUD
@@ -159,6 +162,10 @@ public:
 
 	//convert transformation matrix to tf::Traansform object
 	void matrixAsTransform (const Eigen::Matrix4f&,  tf::Transform&);
+
+	TransformWithFitness find_by_csm();
+	void scanToLDP(sensor_msgs::LaserScan &, LDP &, double);
+	void ldpToScan(LDP &, sensor_msgs::LaserScan &);
 
 };
 

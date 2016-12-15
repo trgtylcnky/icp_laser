@@ -15,6 +15,11 @@ find_package(catkin REQUIRED COMPONENTS
   occupancy_grid_utils
 )
 
+
+find_package(PkgConfig)
+pkg_check_modules(csm REQUIRED csm)
+
+
 ## System dependencies are found with CMake's conventions
  find_package(Boost REQUIRED COMPONENTS system)
 
@@ -121,13 +126,16 @@ include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${occupancy_grid_utils_INCLUDE_DIRS}
-
+   ${csm_INCLUDE_DIRS}
 )
+
+link_directories(${csm_LIBRARY_DIRS})
 
 ## Declare a C++ library
  add_library(icp_laser
    src/icp_laser.cpp
    src/find.cpp
+   src/find_by_csm.cpp
  )
 
 ## Add cmake target dependencies of the library
@@ -150,6 +158,7 @@ add_dependencies(icp_laser_node ${PROJECT_NAME}_gencfg)
 target_link_libraries(icp_laser
   grid_utils
   ${catkin_LIBRARIES}
+   ${csm_LIBRARIES}
 )
 
 ## Specify libraries to link a library or executable target against

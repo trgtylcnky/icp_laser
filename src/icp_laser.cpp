@@ -15,6 +15,7 @@ icp_laser::icp_laser()
 
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 	sim_laser_publisher = nodeHandle.advertise<sensor_msgs::LaserScan>("/icp_laser/simulated_scan", 1000);
+	laser_publisher = nodeHandle.advertise<sensor_msgs::LaserScan>("/icp_laser/scan", 1000);
 	#endif
 
 	#ifdef PUBLISH_SIMULATED_LASER_CLOUD
@@ -102,6 +103,8 @@ void icp_laser::dynamic_reconfigure_callback(icp_laser_config::ICP_LaserConfig &
 
 	fitness_threshold = config.fitness_threshold;
 
+	inlier_distance = config.inlier_distance;
+
 	
 }
 
@@ -175,11 +178,12 @@ sensor_msgs::LaserScan::Ptr icp_laser::createSimulatedLaserScan(geometry_msgs::P
 
 		sml = occupancy_grid_utils::simulateRangeScan(map, pos, scanner_info, false);
 
-		#ifdef PUBLISH_SIMULATED_LASER_SCAN
-		sim_laser_publisher.publish(*sml);
-		#endif
+	//	#ifdef PUBLISH_SIMULATED_LASER_SCAN
+	//	sim_laser_publisher.publish(*sml);
+	//	#endif
 
 	}
+
 	return sml;
 
 }

@@ -112,7 +112,7 @@ icp_laser::find(pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> &icp)
 	}
 
 	twf.transform = t;
-	twf.fitness = icp.getFitnessScore();
+	twf.fitness = icp.getFitnessScore(inlier_distance);
 	
 	return twf;
 

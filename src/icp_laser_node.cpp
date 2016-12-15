@@ -6,23 +6,11 @@ int main(int argc, char** argv)
 	ros::init(argc, argv, "icp_laser_node");
 	ros::NodeHandle n;
 
-	
-	
-
 	icp_laser il;
-
-
-
-
-	il.setUpdateInterval(1);
-
-	il.setICPParameters(0.25, 2500, 1e-9, 1e-8);
 
 	ros::Rate r(5);
 
-
 	pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-
 	
 	while(ros::ok())
 	{
@@ -30,10 +18,13 @@ int main(int argc, char** argv)
 		r.sleep();
 		ros::spinOnce();
 
-		TransformWithFitness t = il.find(icp);
+
+
+		TransformWithFitness t = il.find_by_csm();
 		il.updatePose(t);
 
-		
+		il.find_by_csm();
+
 
 	}
 	
