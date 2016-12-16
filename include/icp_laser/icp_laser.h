@@ -164,7 +164,7 @@ public:
 	void matrixAsTransform (const Eigen::Matrix4f&,  tf::Transform&);
 
 	TransformWithFitness find_by_csm();
-	void scanToLDP(sensor_msgs::LaserScan &, LDP &, double);
+	int scanToLDP(sensor_msgs::LaserScan &, LDP &, double);
 	void ldpToScan(LDP &, sensor_msgs::LaserScan &);
 
 };

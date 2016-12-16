@@ -18,8 +18,8 @@ icp_laser::find_by_csm()
 
 	sensor_msgs::LaserScan::Ptr simulated_scan = createSimulatedLaserScan(p);
 
-	scanToLDP(laser, real_laser_ldp, max_laser_point_width);
-	scanToLDP(*simulated_scan, simulated_laser_ldp, max_laser_point_width);
+	int v = scanToLDP(laser, real_laser_ldp, max_laser_point_width);
+	scanToLDP(*simulated_scan, simulated_laser_ldp, max_simulated_point_width);
 
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 
@@ -96,10 +96,14 @@ icp_laser::find_by_csm()
 	{
 		ROS_INFO("%f %f %f", result.x[0], result.x[1], result.x[2]);
 		ROS_INFO("%f", result.error);
+		twf.fitness = result.error/double (v);
 	}
 
-	else ROS_INFO("invalid");
-
+	else 
+	{
+		ROS_INFO("invalid");
+		twf.fitness = 1000;
+	}
 	ld_free(real_laser_ldp);
 	ld_free(simulated_laser_ldp);
 
@@ -117,15 +121,19 @@ icp_laser::find_by_csm()
 	correction.setRotation(rotation);
 
 	twf.transform = base_transform*correction*laser_to_base;
-	twf.fitness = result.error/1000.0;
+
 
 	return twf;
 }
 
-void icp_laser::scanToLDP(sensor_msgs::LaserScan &scan, LDP &ldp, double width_threshold)
+int icp_laser::scanToLDP(sensor_msgs::LaserScan &scan, LDP &ldp, double width_threshold)
 {
-	int n = 0;
-	for(int i = 0; i<scan.ranges.size(); i++)
+
+
+
+
+	int n = scan.ranges.size();
+/*	for(int i = 0; i<scan.ranges.size(); i++)
 	{
 		double angle = scan.angle_increment*i + scan.angle_min;
 		double local_y = sin(angle)*scan.ranges[i];
@@ -137,37 +145,45 @@ void icp_laser::scanToLDP(sensor_msgs::LaserScan &scan, LDP &ldp, double width_t
 		else n++;
 
 	}
+*/
+	int valids = 0;
 
-	if(n<1) return;
+	if(n<1) return 0;
 
 	ldp = ld_alloc_new(n);
 
-	int k = 0;
 
-	for(int i = 0; i<scan.ranges.size() && k<n; i++)
+	for(int i = 0; i<n; i++)
 	{
 		double angle = scan.angle_increment*i + scan.angle_min;
 		double local_y = sin(angle)*scan.ranges[i];
 		double local_x = cos(angle)*scan.ranges[i];
 
 
-		if(width_threshold != 0 && (fabs(local_y) > width_threshold/2 || local_x < 0 )) continue;
+		if(width_threshold != 0 && (fabs(local_y) > width_threshold/2 || local_x < 0 ))
+		{
+			ldp->valid[i] = 0;
+			ldp->readings[i] = -1;
+		}
 
 		else 
 		{
 
-			ldp->valid[k] = 1;
-			ldp->readings[k] = scan.ranges[i];
-			ldp->theta[k] = angle;
-			ldp->cluster[k] = -1;
+			ldp->valid[i] = 1;
+			ldp->readings[i] = scan.ranges[i];
 
-			k++;
+			valids++;
+
 		}
+		ldp->theta[i] = angle;
+		ldp->cluster[i] = -1;
 
 	}
 
 	ldp->min_theta = ldp->theta[0];
-	ldp->max_theta = ldp->theta[k-1];
+	ldp->max_theta = ldp->theta[n-1];
+
+	return valids;
 }
 
 void icp_laser::ldpToScan(LDP &ldp, sensor_msgs::LaserScan &scan)
