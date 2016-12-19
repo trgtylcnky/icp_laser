@@ -9,6 +9,7 @@
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "sensor_msgs/LaserScan.h"
 #include "nav_msgs/OccupancyGrid.h"
+#include "visualization_msgs/Marker.h"
 
 #include "tf/transform_listener.h"
 
@@ -34,7 +35,7 @@
 
 #define PUBLISH_LASER_CLOUD
 
-
+#define PUBLISH_CORRESPONDENCES
 
 struct TransformWithFitness
 {
@@ -82,6 +83,10 @@ class icp_laser
 	ros::Publisher transformed_laser_cloud_publisher;
 	#endif
 
+	#ifdef PUBLISH_CORRESPONDENCES
+	ros::Publisher cor_publisher;
+	#endif
+
 	//Neglect laser data far away from that distance
 	double max_simulated_point_distance;
 	double max_simulated_point_width;
@@ -113,6 +118,8 @@ class icp_laser
 	double pose_covariance_xx;
 	double pose_covariance_yy;
 	double pose_covariance_aa;
+
+
 
 
 

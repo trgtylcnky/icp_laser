@@ -8,7 +8,7 @@ int main(int argc, char** argv)
 
 	icp_laser il;
 
-	ros::Rate r(5);
+	ros::Rate r(2);
 
 	pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 	

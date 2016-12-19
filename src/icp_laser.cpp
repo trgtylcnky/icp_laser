@@ -27,6 +27,10 @@ icp_laser::icp_laser()
 	transformed_laser_cloud_publisher= nodeHandle.advertise<pcl::PointCloud<pcl::PointXYZ> >("/icp_laser/transformed_laser_cloud", 1000);
 	#endif
 
+	#ifdef PUBLISH_CORRESPONDENCES
+	cor_publisher = nodeHandle.advertise<visualization_msgs::Marker>("/icp_laser/correspondences", 10);
+	#endif
+
 	laser_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new (pcl::PointCloud<pcl::PointXYZ>));
 	laser_cloud->header.frame_id = "/map";
 

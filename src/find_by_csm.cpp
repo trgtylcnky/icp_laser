@@ -8,6 +8,11 @@ icp_laser::find_by_csm()
 {
 	TransformWithFitness twf;
 
+	twf.transform.setIdentity();
+	twf.fitness = 1000;
+
+	if(!we_have_laser || !we_have_map) return twf;
+
 	sm_params input;
 	sm_result result;
 
@@ -19,7 +24,23 @@ icp_laser::find_by_csm()
 	sensor_msgs::LaserScan::Ptr simulated_scan = createSimulatedLaserScan(p);
 
 	int v = scanToLDP(laser, real_laser_ldp, max_laser_point_width);
-	scanToLDP(*simulated_scan, simulated_laser_ldp, max_simulated_point_width);
+
+
+	if(v<30) 
+	{
+		ROS_INFO("not enough valid data");
+		return twf;
+
+	}
+
+	v = scanToLDP(*simulated_scan, simulated_laser_ldp, max_simulated_point_width);
+
+	if(v<30) 
+	{
+		ROS_INFO("not enough valid data");
+		return twf;
+
+	}
 
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 
@@ -31,6 +52,7 @@ icp_laser::find_by_csm()
 	sim_laser_publisher.publish(windowed);
 
 	#endif
+
 
 	ROS_INFO("aa");
 
@@ -80,6 +102,8 @@ icp_laser::find_by_csm()
 
 	input.use_sigma_weights = 0;
 
+	input.use_ml_weights = 0;
+
 
 
 	result.cov_x_m = 0;
@@ -96,7 +120,13 @@ icp_laser::find_by_csm()
 	{
 		ROS_INFO("%f %f %f", result.x[0], result.x[1], result.x[2]);
 		ROS_INFO("%f", result.error);
-		twf.fitness = result.error/double (v);
+
+		int num_of_corr = 1;
+		for(int i = 0; i<real_laser_ldp->nrays; i++)
+		{
+			if(real_laser_ldp->corr[i].valid) num_of_corr++;
+		}
+		twf.fitness = result.error/double(num_of_corr-1);
 	}
 
 	else 
@@ -104,12 +134,6 @@ icp_laser::find_by_csm()
 		ROS_INFO("invalid");
 		twf.fitness = 1000;
 	}
-	ld_free(real_laser_ldp);
-	ld_free(simulated_laser_ldp);
-
-	gsl_matrix_free(result.cov_x_m);
-	gsl_matrix_free(result.dx_dy1_m);
-	gsl_matrix_free(result.dx_dy2_m);
 
 	tf::Transform correction;
 
@@ -122,6 +146,69 @@ icp_laser::find_by_csm()
 
 	twf.transform = base_transform*correction*laser_to_base;
 
+
+
+
+
+	//Visualize correspondences
+#ifdef PUBLISH_CORRESPONDENCES
+	visualization_msgs::Marker correspondences_marker;
+	correspondences_marker.header.frame_id = "/base_laser_link";
+	correspondences_marker.header.stamp = ros::Time();
+	correspondences_marker.ns = "icp_laser";
+	correspondences_marker.id = 0;
+	correspondences_marker.type = visualization_msgs::Marker::LINE_LIST;
+//	correspondences_marker.action = visualization_msgs::Marker::ADD;
+
+	correspondences_marker.color.g = 1;
+	correspondences_marker.color.a = 1;
+
+	correspondences_marker.scale.x = 0.01;
+
+
+	for(int i = 0; i<real_laser_ldp->nrays; i++)
+	{
+		if(real_laser_ldp->corr[i].valid)
+		{
+			int ic = real_laser_ldp->corr[i].j1;
+
+			if(simulated_laser_ldp->valid[ic])
+			{
+				geometry_msgs::Point pn;
+				pn.x = real_laser_ldp->points[i].p[0];
+				pn.y = real_laser_ldp->points[i].p[1];
+				pn.z = 0;
+				correspondences_marker.points.push_back(pn);
+
+				
+
+				//2ROS_INFO("%d -> %d", i, ic);
+				
+
+				pn.x = simulated_laser_ldp->points[ic].p[0];
+				pn.y = simulated_laser_ldp->points[ic].p[1];
+				correspondences_marker.points.push_back(pn);
+
+			}
+
+
+
+		}
+	}
+
+	cor_publisher.publish(correspondences_marker);
+
+#endif
+
+
+
+
+	ld_free(real_laser_ldp);
+	ld_free(simulated_laser_ldp);
+
+	gsl_matrix_free(result.cov_x_m);
+	gsl_matrix_free(result.dx_dy1_m);
+	gsl_matrix_free(result.dx_dy2_m);
 
 	return twf;
 }
