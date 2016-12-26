@@ -104,6 +104,8 @@ icp_laser::find_by_csm()
 
 	input.use_ml_weights = 0;
 
+	input.do_visibility_test = 1;
+
 
 
 	result.cov_x_m = 0;
@@ -144,11 +146,42 @@ icp_laser::find_by_csm()
 	correction.setOrigin(origin);
 	correction.setRotation(rotation);
 
+	tf::Transform n = base_transform*correction;
 	twf.transform = base_transform*correction*laser_to_base;
 
+	geometry_msgs::Pose pose_new;
+	tf::poseTFToMsg (n, pose_new);
+
+	sensor_msgs::LaserScan::Ptr simulated_scan_new = createSimulatedLaserScan(pose_new);
+	int num_of_matches = 0;
+	int num_of_total = 0;
+	double tolerance = 0.01;
+	double noise = 0.01;
+	double error = 0;
+	for(int i = 0; i<laser.ranges.size(); i++)
+	{
+		double angle = laser.angle_increment*i + laser.angle_min;
+		double local_y = sin(angle)*laser.ranges[i];
+		double local_x = cos(angle)*laser.ranges[i];
+
+		if( (fabs(local_y) > max_laser_point_width/2 || local_x < 0 )) continue;
+
+		if((*simulated_scan_new).ranges[i] - laser.ranges[i] < noise) //ray is valid
+		{
+			num_of_total++;
+			error += fabs((*simulated_scan_new).ranges[i] - laser.ranges[i]);
+
+			if( fabs((*simulated_scan_new).ranges[i] - laser.ranges[i]) < tolerance ) num_of_matches++;
+
+		}
 
 
+	}
+	if(num_of_total < 40) twf.fitness = 1000;
+	else
+		twf.fitness=error/double(num_of_total);
 
+	corrected_sim_publisher.publish(*simulated_scan_new);
 
 	//Visualize correspondences
 #ifdef PUBLISH_CORRESPONDENCES

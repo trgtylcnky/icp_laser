@@ -15,6 +15,7 @@ icp_laser::icp_laser()
 
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 	sim_laser_publisher = nodeHandle.advertise<sensor_msgs::LaserScan>("/icp_laser/simulated_scan", 1000);
+	corrected_sim_publisher = nodeHandle.advertise<sensor_msgs::LaserScan>("/icp_laser/simulated_scan_corrected", 1000);
 	laser_publisher = nodeHandle.advertise<sensor_msgs::LaserScan>("/icp_laser/scan", 1000);
 	#endif
 

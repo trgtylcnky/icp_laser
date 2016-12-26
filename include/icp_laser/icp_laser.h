@@ -72,6 +72,7 @@ class icp_laser
 	#ifdef PUBLISH_SIMULATED_LASER_SCAN
 	ros::Publisher sim_laser_publisher;
 	ros::Publisher laser_publisher;
+	ros::Publisher corrected_sim_publisher;
 	#endif
 
 	#ifdef PUBLISH_SIMULATED_LASER_CLOUD
